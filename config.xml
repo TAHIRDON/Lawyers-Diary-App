@@ -1,0 +1,52 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="com.yourapp.lawyersdiary" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>Lawyer's Diary</name>
+    <description>A diary application for lawyers.</description>
+    <author email="dev@cordova.apache.org" href="https://cordova.apache.org">
+        Apache Cordova Team
+    </author>
+    <content src="index.html" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+    
+    <platform name="android">
+        <!-- App Icon Configuration -->
+        <icon density="ldpi" src="www/icon.png" />
+        <icon density="mdpi" src="www/icon.png" />
+        <icon density="hdpi" src="www/icon.png" />
+        <icon density="xhdpi" src="www/icon.png" />
+        <icon density="xxhdpi" src="www/icon.png" />
+        <icon density="xxxhdpi" src="www/icon.png" />
+
+        <!-- Splash Screen Configuration -->
+        <preference name="SplashScreen" value="screen" />
+        <preference name="SplashScreenDelay" value="3000" />
+        <preference name="SplashMaintainAspectRatio" value="true" />
+        <splash density="land-hdpi" src="www/splash.png" />
+        <splash density="land-ldpi" src="www/splash.png" />
+        <splash density="land-mdpi" src="www/splash.png" />
+        <splash density="land-xhdpi" src="www/splash.png" />
+        <splash density="port-hdpi" src="www/splash.png" />
+        <splash density="port-ldpi" src="www/splash.png" />
+        <splash density="port-mdpi" src="www/splash.png" />
+        <splash density="port-xhdpi" src="www/splash.png" />
+
+        <!-- Build & Permission Settings -->
+        <preference name="android-compileSdkVersion" value="36" />
+        <preference name="android-buildToolsVersion" value="36.0.0" />
+        <preference name="android-targetSdkVersion" value="36" />
+
+        <!-- Permissions for Local Notifications to work in the background -->
+        <config-file parent="/manifest" target="AndroidManifest.xml">
+            <!-- Allows notifications to be restored after device reboot -->
+            <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+            <!-- Allows the app to wake the device to send a notification -->
+            <uses-permission android:name="android.permission.WAKE_LOCK" />
+            <!-- Required for scheduling exact alarms on newer Android versions -->
+            <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+            <!-- Required for notifications on Android 13+ -->
+            <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+        </config-file>
+    </platform>
+
+</widget>

@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<!-- The 'dark' class will be managed by JavaScript -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Ensure the app is responsive and scales correctly on mobile devices -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Lawyer's Diary</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase Libraries (using the compat libraries for the provided syntax) -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <!-- Cordova script for native device features -->
+    <script src="cordova.js"></script>
+    <style>
+        /* Custom styles for the modal to ensure it's scrollable on smaller screens */
+        .modal-body { max-height: 75vh; overflow-y: auto; }
+        .modal { transition: opacity 0.25s ease; }
+        /* Add a subtle animation for the loading spinner */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        /* Light mode styles */
+        body.light {
+            background-color: #f3f4f6; /* gray-100 */
+            color: #1f2937; /* gray-800 */
+        }
+        .light .bg-gray-800 { background-color: #ffffff; }
+        .light .bg-gray-900 { background-color: #f9fafb; /* gray-50 */ }
+        .light .text-white { color: #111827; /* gray-900 */ }
+        .light .text-gray-400 { color: #6b7280; /* gray-500 */ }
+        .light .border-gray-600 { border-color: #d1d5db; /* gray-300 */ }
+        .light .bg-gray-700 { background-color: #f3f4f6; /* gray-100 */ }
+        .light .text-blue-400 { color: #3b82f6; /* blue-500 */ }
+        .light .text-red-400 { color: #ef4444; /* red-500 */ }
+        .light .rounded-full.bg-gray-700 { background-color: #e5e7eb; /* gray-200 */ }
+        .light .hover\:bg-gray-700:hover { background-color: #d1d5db; /* gray-300 */}
+        .light .border-gray-700 { border-color: #e5e7eb; /* gray-200 */ }
+
+        /* --- VISIBILITY FIX FOR LIGHT MODE --- */
+        .light .text-gray-300 { color: #374151; /* gray-700 */ }
+        .light .text-gray-200 { color: #374151; /* gray-700 */ }
+        /* --- END OF FIX --- */
+    </style>
+</head>
+<!-- The `body` tag will also have its class managed by JavaScript -->
+<body class="font-sans">
+
+    <!-- Loading Spinner (Visible on startup) -->
+    <div id="loading-spinner" class="flex flex-col items-center justify-center h-screen bg-white">
+        <!-- App Icon as a loading indicator -->
+        <img src="img/icon.png" alt="Loading Icon" class="h-24 w-24 animate-pulse rounded-lg">
+        <p class="mt-4 text-gray-700">Loading Diary...</p>
+    </div>
+
+    <!-- Login Section (Initially hidden) -->
+    <div id="login-section" class="flex items-center justify-center h-screen hidden p-4">
+        <div class="w-full max-w-md bg-gray-800 rounded-lg shadow-md p-8">
+            <h2 class="text-2xl font-bold text-center text-white mb-2">Lawyer's Diary</h2>
+            <p class="text-center text-gray-400 mb-8">Please sign in or create an account</p>
+            <form id="login-form" class="space-y-6">
+                <div><label for="login-email" class="block text-sm font-medium text-gray-300">Email Address</label><input type="email" id="login-email" required class="mt-1 block w-full px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white"></div>
+                <div>
+                    <div class="flex items-center justify-between">
+                        <label for="login-password" class="block text-sm font-medium text-gray-300">Password</label>
+                        <a href="#" id="forgot-password-link" class="text-sm text-blue-400 hover:text-blue-300">Forgot password?</a>
+                    </div>
+                    <input type="password" id="login-password" required class="mt-1 block w-full px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white">
+                </div>
+                <p id="login-error" class="text-red-500 text-sm hidden"></p>
+                <div><button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Sign In</button></div>
+            </form>
+            <div class="text-center mt-6"><a href="#" id="show-signup" class="text-sm text-blue-400 hover:text-blue-300">Don't have an account? Sign Up</a></div>
+            <form id="signup-form" class="space-y-6 hidden">
+                <div><label for="signup-email" class="block text-sm font-medium text-gray-300">Email Address</label><input type="email" id="signup-email" required class="mt-1 block w-full px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white"></div>
+                <div><label for="signup-password" class="block text-sm font-medium text-gray-300">Password</label><input type="password" id="signup-password" required class="mt-1 block w-full px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white"></div>
+                <p id="signup-error" class="text-red-500 text-sm hidden"></p>
+                <div><button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">Create Account</button></div>
+            </form>
+            <div class="text-center mt-4"><a href="#" id="show-login" class="text-sm text-blue-400 hover:text-blue-300 hidden">Already have an account? Sign In</a></div>
+        </div>
+    </div>
+
+    <!-- Diary Section (Initially hidden) -->
+    <div id="diary-section" class="hidden">
+        <header class="bg-gray-800 shadow-md sticky top-0 z-10">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <img src="img/icon.png" alt="App Icon" class="h-8 w-8 rounded-md">
+                        <h1 class="text-2xl sm:text-3xl font-bold text-white">Lawyer's Diary</h1>
+                    </div>
+                    <div class="flex items-center space-x-2 w-full sm:w-auto">
+                        <input type="text" id="search-input" placeholder="Search..." class="px-4 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white w-full"/>
+                        <!-- Theme Toggle Button -->
+                        <button id="theme-toggle" class="flex-shrink-0 flex items-center justify-center bg-gray-700 text-white p-2.5 rounded-md shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                            <!-- NEW Sun Icon -->
+                            <svg id="theme-icon-sun" class="h-5 w-5 hidden" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.106a.75.75 0 010 1.06l-1.591 1.59a.75.75 0 11-1.06-1.06l1.59-1.59a.75.75 0 011.06 0zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.894 17.894a.75.75 0 01-1.06 0l-1.59-1.591a.75.75 0 111.06-1.06l1.59 1.59a.75.75 0 010 1.061zM12 18.75a.75.75 0 01-.75.75v2.25a.75.75 0 011.5 0V19.5a.75.75 0 01-.75-.75zM5.106 17.894a.75.75 0 010-1.06l1.59-1.59a.75.75 0 111.06 1.06l-1.59 1.59a.75.75 0 01-1.06 0zM3 12a.75.75 0 01.75-.75h2.25a.75.75 0 010 1.5H3.75A.75.75 0 013 12zM6.106 5.106a.75.75 0 011.06 0l1.59 1.591a.75.75 0 11-1.06 1.06l-1.59-1.59a.75.75 0 010-1.06z" />
+                            </svg>
+                            <!-- Moon Icon for Light Mode -->
+                            <svg id="theme-icon-moon" class="h-5 w-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                        </button>
+                        <button id="new-entry-btn" class="flex-shrink-0 flex items-center justify-center bg-blue-600 text-white p-2.5 rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                        </button>
+                        <button id="logout-btn" class="flex-shrink-0 flex items-center justify-center bg-red-600 text-white p-2.5 rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div id="entries-container" class="space-y-6"></div>
+            <div id="no-entries-message" class="hidden text-center py-16 px-6 bg-gray-800 rounded-lg shadow-md"></div>
+        </main>
+    </div>
+
+    <!-- Modal for Add/Edit Entry -->
+    <div id="entry-modal" class="modal fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4 hidden">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl">
+            <div class="p-6 modal-body">
+                <h2 id="modal-title" class="text-2xl font-bold text-white mb-6">Add New Diary Entry</h2>
+                <form id="entry-form" class="space-y-4">
+                    <input type="hidden" id="entry-id" name="id">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label for="entryDate" class="block text-sm font-medium text-gray-300">Date</label><input type="date" id="entryDate" name="entryDate" required class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-white"/></div>
+                        <div><label for="courtName" class="block text-sm font-medium text-gray-300">Court Name</label><input type="text" id="courtName" name="courtName" placeholder="e.g., District Court, Anand" required class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-white"/></div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label for="caseNumber" class="block text-sm font-medium text-gray-300">Case Number</label><input type="text" id="caseNumber" name="caseNumber" placeholder="e.g., Civil Suit No. 123/2024" required class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-white"/></div>
+                        <div><label for="caseSection" class="block text-sm font-medium text-gray-300">Section</label><input type="text" id="caseSection" name="caseSection" placeholder="e.g., Sec. 138" class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-white"/></div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label for="parties" class="block text-sm font-medium text-gray-300">Parties</label><input type="text" id="parties" name="parties" placeholder="e.g., Client vs. Opponent" required class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-white"/></div>
+                        <div><label for="oppositionLawyer" class="block text-sm font-medium text-gray-300">Opposition Lawyer Name</label><input type="text" id="oppositionLawyer" name="oppositionLawyer" placeholder="e.g., Mr. Shah" class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-white"/></div>
+                    </div>
+                    <div><label for="caseStage" class="block text-sm font-medium text-gray-300">Stage of Case</label><input type="text" id="caseStage" name="caseStage" placeholder="e.g., For Evidence" required class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-white"/></div>
+                    <div><label for="proceedings" class="block text-sm font-medium text-gray-300">Proceedings / Summary</label><textarea id="proceedings" name="proceedings" rows="3" placeholder="Summary of what happened in court..." required class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-white"></textarea></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label for="paymentDone" class="block text-sm font-medium text-gray-300">Payment Done</label><input type="number" id="paymentDone" name="paymentDone" placeholder="e.g., 5000" class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-white"/></div>
+                        <div><label for="paymentRemaining" class="block text-sm font-medium text-gray-300">Payment Remaining</label><input type="number" id="paymentRemaining" name="paymentRemaining" placeholder="e.g., 2000" class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-white"/></div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label for="nextDate" class="block text-sm font-medium text-gray-300">Next Hearing Date</label><input type="date" id="nextDate" name="nextDate" class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-white"/></div>
+                        <div><label for="alarmTime" class="block text-sm font-medium text-gray-300">Alarm Time</label><input type="time" id="alarmTime" name="alarmTime" class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-white"/></div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div><label for="tasks" class="block text-sm font-medium text-gray-300">Tasks / To-Do</label><input type="text" id="tasks" name="tasks" placeholder="e.g., Draft application" class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-white"/></div>
+                    </div>
+                    <div class="flex items-center justify-end pt-4 space-x-3 border-t border-gray-700 mt-6">
+                        <button type="button" id="cancel-btn" class="px-6 py-2 rounded-md text-sm font-medium text-gray-300 bg-gray-600 hover:bg-gray-500">Cancel</button>
+                        <button type="submit" class="px-6 py-2 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">Save Entry</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal for Forgot Password -->
+    <div id="forgot-password-modal" class="modal fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4 hidden">
+        <div class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-md p-8">
+            <h2 class="text-2xl font-bold text-white mb-4">Reset Password</h2>
+            <p class="text-gray-400 mb-6">Enter your email address and we will send you a link to reset your password.</p>
+            <form id="forgot-password-form">
+                <div><label for="reset-email" class="block text-sm font-medium text-gray-300">Email Address</label><input type="email" id="reset-email" required class="mt-1 block w-full px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white"></div>
+                <p id="reset-message" class="text-sm mt-4 hidden"></p>
+                <div class="flex items-center justify-end pt-6 space-x-3">
+                    <button type="button" id="cancel-reset-btn" class="px-6 py-2 rounded-md text-sm font-medium text-gray-300 bg-gray-600 hover:bg-gray-500">Cancel</button>
+                    <button type="submit" class="px-6 py-2 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">Send Reset Email</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <script>
+        // IMPORTANT: Replace these placeholder values with your actual Firebase project configuration.
+        const firebaseConfig = {
+            apiKey: "AIzaSyBefaJsUK9PEVaJnlhUPBefR3Cr-_Ri2mo",
+            authDomain: "lawyer-s-diary-eebc4.firebaseapp.com",
+            projectId: "lawyer-s-diary-eebc4",
+            storageBucket: "lawyer-s-diary-eebc4.appspot.com",
+            messagingSenderId: "793308567353",
+            appId: "1:793308567353:web:acb8168ce8079d6467fae8",
+            measurementId: "G-T083FF2X2M"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        
+        // --- UI Elements ---
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const loginSection = document.getElementById('login-section');
+        const diarySection = document.getElementById('diary-section');
+        const loginForm = document.getElementById('login-form');
+        const signupForm = document.getElementById('signup-form');
+        const loginError = document.getElementById('login-error');
+        const signupError = document.getElementById('signup-error');
+        const showSignupBtn = document.getElementById('show-signup');
+        const showLoginBtn = document.getElementById('show-login');
+        const forgotPasswordLink = document.getElementById('forgot-password-link');
+        const forgotPasswordModal = document.getElementById('forgot-password-modal');
+        const forgotPasswordForm = document.getElementById('forgot-password-form');
+        const cancelResetBtn = document.getElementById('cancel-reset-btn');
+        const resetMessage = document.getElementById('reset-message');
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const themeIconSun = document.getElementById('theme-icon-sun');
+        const themeIconMoon = document.getElementById('theme-icon-moon');
+
+        // --- THEME LOGIC ---
+        // Function to apply the selected theme
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+                document.body.classList.remove('light');
+                document.body.classList.add('bg-gray-900', 'text-white');
+                themeIconSun.classList.remove('hidden');
+                themeIconMoon.classList.add('hidden');
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.body.classList.add('light');
+                document.body.classList.remove('bg-gray-900', 'text-white');
+                themeIconSun.classList.add('hidden');
+                themeIconMoon.classList.remove('hidden');
+            }
+        }
+
+        // Check for saved theme in localStorage and apply it on load
+        const savedTheme = localStorage.getItem('theme') || 'dark'; // Default to dark mode
+        applyTheme(savedTheme);
+
+        // Event listener for the theme toggle button
+        themeToggleBtn.addEventListener('click', () => {
+            const currentTheme = localStorage.getItem('theme') || 'dark';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('theme', newTheme);
+            applyTheme(newTheme);
+        });
+        
+        // --- AUTHENTICATION LOGIC ---
+        auth.onAuthStateChanged(user => {
+            loadingSpinner.classList.add('hidden');
+            if (user) {
+                loginSection.classList.add('hidden');
+                diarySection.classList.remove('hidden');
+                initializeDiary(user);
+            } else {
+                diarySection.classList.add('hidden');
+                loginSection.classList.remove('hidden');
+            }
+        });
+
+        // --- LOGIN/SIGNUP/RESET EVENT LISTENERS ---
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+                .then(() => auth.signInWithEmailAndPassword(email, password))
+                .catch(error => {
+                    loginError.textContent = error.message;
+                    loginError.classList.remove('hidden');
+                });
+        });
+
+        signupForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            auth.createUserWithEmailAndPassword(email, password)
+                .catch(error => {
+                    signupError.textContent = error.message;
+                    signupError.classList.remove('hidden');
+                });
+        });
+        
+        forgotPasswordLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            forgotPasswordModal.classList.remove('hidden');
+        });
+
+        cancelResetBtn.addEventListener('click', () => {
+            forgotPasswordModal.classList.add('hidden');
+            resetMessage.classList.add('hidden');
+            forgotPasswordForm.reset();
+        });
+
+        forgotPasswordForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('reset-email').value;
+            auth.sendPasswordResetEmail(email)
+                .then(() => {
+                    resetMessage.textContent = "Password reset email sent! Please check your inbox.";
+                    resetMessage.classList.remove('text-red-500');
+                    resetMessage.classList.add('text-green-500');
+                    resetMessage.classList.remove('hidden');
+                })
+                .catch((error) => {
+                    resetMessage.textContent = error.message;
+                    resetMessage.classList.remove('text-green-600');
+                    resetMessage.classList.add('text-red-500');
+                    resetMessage.classList.remove('hidden');
+                });
+        });
+
+        showSignupBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            loginForm.classList.add('hidden');
+            showSignupBtn.classList.add('hidden');
+            signupForm.classList.remove('hidden');
+            showLoginBtn.classList.remove('hidden');
+        });
+
+        showLoginBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            signupForm.classList.add('hidden');
+            showLoginBtn.classList.add('hidden');
+            loginForm.classList.remove('hidden');
+            showSignupBtn.classList.remove('hidden');
+        });
+
+        // --- DIARY LOGIC ---
+        function initializeDiary(user) {
+            const entriesCollection = db.collection('users').doc(user.uid).collection('entries');
+            let allEntries = [];
+            
+            document.addEventListener('deviceready', onDeviceReady, false);
+            function onDeviceReady() {
+                console.log('Device is ready. Cordova plugins are available.');
+                // Enable background mode to keep notifications running
+                if(window.cordova && cordova.plugins.backgroundMode) {
+                    cordova.plugins.backgroundMode.enable();
+                    // Ask to ignore battery optimizations
+                    cordova.plugins.backgroundMode.isIgnoringBatteryOptimizations(function(isIgnoring) {
+                        if (!isIgnoring) {
+                            cordova.plugins.backgroundMode.disableWebViewOptimizations();
+                            cordova.plugins.backgroundMode.disableBatteryOptimizations();
+                        }
+                    });
+                }
+                // Request notification permissions
+                if (window.cordova && cordova.plugins && cordova.plugins.notification) {
+                    cordova.plugins.notification.local.requestPermission(granted => {
+                        console.log('Notification permission granted: ' + granted);
+                    });
+                }
+            }
+            
+            entriesCollection.orderBy('entryDate', 'desc').onSnapshot(snapshot => {
+                allEntries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderEntries(allEntries);
+            }, error => {
+                console.error("Error fetching entries: ", error);
+                alert("Error: Could not load diary entries. Please check your Firestore security rules and internet connection.");
+            });
+            
+            document.getElementById('logout-btn').addEventListener('click', () => auth.signOut());
+            
+            const entriesContainer = document.getElementById('entries-container');
+            const searchInput = document.getElementById('search-input');
+            const modal = document.getElementById('entry-modal');
+            const entryForm = document.getElementById('entry-form');
+
+            document.getElementById('new-entry-btn').addEventListener('click', () => {
+                entryForm.reset();
+                document.getElementById('entry-id').value = '';
+                document.getElementById('modal-title').textContent = 'Add New Diary Entry';
+                document.getElementById('entryDate').valueAsDate = new Date();
+                modal.classList.remove('hidden');
+            });
+
+            document.getElementById('cancel-btn').addEventListener('click', () => modal.classList.add('hidden'));
+
+            entryForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const formData = new FormData(entryForm);
+                const entryData = Object.fromEntries(formData.entries());
+                const entryId = entryData.id;
+                delete entryData.id;
+
+                const saveOperation = entryId 
+                    ? entriesCollection.doc(entryId).update(entryData) 
+                    : entriesCollection.add(entryData);
+
+                saveOperation.then(docRef => {
+                    modal.classList.add('hidden');
+                    const savedId = entryId || docRef.id;
+                    scheduleNotification(entryData, savedId);
+                }).catch(err => {
+                    console.error("Error saving entry: ", err);
+                    alert("Could not save entry: " + err.message);
+                });
+            });
+
+            entriesContainer.addEventListener('click', (e) => {
+                const target = e.target.closest('button');
+                if (!target) return;
+
+                const id = target.dataset.id;
+                if (target.classList.contains('edit-btn')) {
+                    const entryToEdit = allEntries.find(entry => entry.id === id);
+                    if (entryToEdit) {
+                        Object.keys(entryToEdit).forEach(key => {
+                            const input = entryForm.elements[key];
+                            if (input) input.value = entryToEdit[key];
+                        });
+                        document.getElementById('modal-title').textContent = 'Edit Diary Entry';
+                        modal.classList.remove('hidden');
+                    }
+                }
+                if (target.classList.contains('delete-btn')) {
+                    if (confirm('Are you sure you want to delete this entry?')) {
+                        entriesCollection.doc(id).delete().then(() => {
+                            cancelNotification(id);
+                        }).catch(err => alert(err.message));
+                    }
+                }
+            });
+
+            searchInput.addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                const filtered = allEntries.filter(entry => 
+                    Object.values(entry).some(value => 
+                        String(value).toLowerCase().includes(searchTerm)
+                    )
+                );
+                renderEntries(filtered);
+            });
+        }
+
+        // --- NOTIFICATION LOGIC ---
+        function getNumericId(textId) {
+            let hash = 0;
+            for (let i = 0; i < textId.length; i++) {
+                hash = ((hash << 5) - hash) + textId.charCodeAt(i);
+                hash |= 0;
+            }
+            return Math.abs(hash);
+        }
+
+        function scheduleNotification(entryData, entryId) {
+            if (window.cordova && cordova.plugins && cordova.plugins.notification && entryData.nextDate && entryData.alarmTime) {
+                const alarmDateTime = new Date(`${entryData.nextDate}T${entryData.alarmTime}`);
+                const numericId = getNumericId(entryId);
+
+                if (alarmDateTime > new Date()) {
+                    cordova.plugins.notification.local.schedule({
+                        id: numericId,
+                        title: `Hearing Reminder: ${entryData.caseNumber}`,
+                        text: `Case: ${entryData.parties}\nStage: ${entryData.caseStage}`,
+                        trigger: { at: alarmDateTime },
+                        foreground: true,
+                        vibrate: true,
+                        icon: 'res://icon', // Use the app's icon for the notification
+                        smallIcon: 'res://icon', // Use the app's icon for the status bar
+                        allowWhileIdle: true
+                    });
+                     console.log(`Notification scheduled for entry ${entryId} at ${alarmDateTime}`);
+                }
+            }
+        }
+        
+        function cancelNotification(entryId) {
+             if (window.cordova && cordova.plugins && cordova.plugins.notification) {
+                 const numericId = getNumericId(entryId);
+                 cordova.plugins.notification.local.cancel(numericId, () => {
+                     console.log(`Notification cancelled for entry ${entryId}`);
+                 });
+             }
+        }
+        
+        // --- RENDERING LOGIC ---
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            return new Date(dateString + 'T00:00:00').toLocaleDateString('en-IN', options);
+        };
+
+        function renderEntries(entries) {
+            const entriesContainer = document.getElementById('entries-container');
+            const noEntriesMessage = document.getElementById('no-entries-message');
+            entriesContainer.innerHTML = '';
+            if (entries.length === 0) {
+                noEntriesMessage.innerHTML = `<h3 class="mt-2 text-lg font-medium text-gray-300">No Diary Entries</h3><p class="mt-1 text-sm text-gray-400">Get started by creating a new entry.</p>`;
+                noEntriesMessage.classList.remove('hidden');
+            } else {
+                noEntriesMessage.classList.add('hidden');
+                entries.forEach(entry => {
+                    const entryCard = document.createElement('div');
+                    entryCard.className = "bg-gray-800 rounded-lg shadow-lg overflow-hidden";
+                    const sectionDisplay = entry.caseSection ? ` (Sec: ${entry.caseSection})` : '';
+                    const paymentDone = entry.paymentDone ? parseFloat(entry.paymentDone).toLocaleString('en-IN') : '0';
+                    const paymentRemaining = entry.paymentRemaining ? parseFloat(entry.paymentRemaining).toLocaleString('en-IN') : '0';
+                    
+                    entryCard.innerHTML = `
+                        <div class="p-6">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+                                <div>
+                                    <p class="text-sm font-semibold text-blue-400">${entry.courtName || 'N/A'}</p>
+                                    <h3 class="text-xl font-bold text-white">${entry.caseNumber || 'N/A'}${sectionDisplay}</h3>
+                                    <p class="text-md text-gray-300">${entry.parties || 'N/A'}</p>
+                                </div>
+                                <div class="mt-3 sm:mt-0 flex items-center bg-gray-700 px-3 py-1.5 rounded-full text-sm font-medium text-gray-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                    ${formatDate(entry.entryDate)}
+                                </div>
+                            </div>
+                            <div class="space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm text-gray-300">
+                                    <p><strong class="font-medium text-gray-400">Opposition Lawyer:</strong> ${entry.oppositionLawyer || 'N/A'}</p>
+                                    <p><strong class="font-medium text-gray-400">Stage:</strong> ${entry.caseStage || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <strong class="font-medium text-gray-400 block mb-1">Proceedings:</strong>
+                                    <p class="text-gray-200 bg-gray-700 p-3 rounded-md border border-gray-600 whitespace-pre-wrap">${entry.proceedings || 'N/A'}</p>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm text-gray-300 pt-2 border-t border-gray-700 mt-4">
+                                    <p><strong class="font-medium text-gray-400">Payment Done:</strong> ₹ ${paymentDone}</p>
+                                    <p><strong class="font-medium text-gray-400">Payment Remaining:</strong> ₹ ${paymentRemaining}</p>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm text-gray-300 pt-2 border-t border-gray-700 mt-4">
+                                    <p><strong class="font-medium text-gray-400">Tasks / To-Do:</strong> ${entry.tasks || 'None'}</p>
+                                    <p class="font-semibold ${entry.nextDate ? 'text-red-400' : 'text-gray-400'}">
+                                        <strong class="font-medium text-gray-400">Next Date:</strong> ${formatDate(entry.nextDate)} ${entry.alarmTime || ''}
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="flex justify-end space-x-3 mt-6">
+                                <button data-id="${entry.id}" class="edit-btn p-2 text-gray-400 hover:text-blue-400 hover:bg-gray-700 rounded-full">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 3.732z" /></svg>
+                                </button>
+                                <button data-id="${entry.id}" class="delete-btn p-2 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded-full">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                            </div>
+                        </div>`;
+                    entriesContainer.appendChild(entryCard);
+                });
+            }
+        };
+    </script>
+</body>
+</html>
